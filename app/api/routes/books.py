@@ -6,7 +6,7 @@ from starlette import status
 
 from app.api.dependencies.repositories import get_repository
 from app.db.repository.book import BookRepository
-from app.schemas.library import BookRead, BookCreate, BookPatch
+from app.schemas.books import BookRead, BookCreate, BookPatch
 
 router = APIRouter(tags=["Books"])
 

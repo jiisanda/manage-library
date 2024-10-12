@@ -20,7 +20,8 @@ class Book(Base):
     publisher: Optional[str] = Column(String)
     stock: int = Column(Integer, default=0)
 
-    transactions = relationship("Transaction", backref="book", lazy=True)
+    transactions = relationship("Transactions", backref="book", lazy=True)
+
 
 
 class Members(Base):
@@ -32,15 +33,15 @@ class Members(Base):
     address: Optional[str] = Column(Text)
     debt: int = Column(Integer, default=0)
 
-    transactions = relationship("Transaction", backref="members", lazy=True)
+    transactions = relationship("Transactions", backref="members", lazy=True)
 
 
 class Transactions(Base):
     __tablename__ = 'transactions'
 
     id: UUID = Column(UUID(as_uuid=True), default=uuid4, primary_key=True, index=True, nullable=False)
-    book_id: Mapped[str] = Column(String, ForeignKey('book.id'), nullable=False)
-    member_id: Mapped[str] = Column(String, ForeignKey('members.id'), nullable=False)
+    book_id: Mapped[UUID] = Column(UUID(as_uuid=True), ForeignKey('book.id'), nullable=False)
+    member_id: Mapped[UUID] = Column(UUID(as_uuid=True), ForeignKey('members.id'), nullable=False)
     status: Enum = Column(Enum(TransactionStatus), default=TransactionStatus.issued)
     issue_date = Column(
         DateTime(timezone=True),
