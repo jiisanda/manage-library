@@ -52,9 +52,9 @@ class TransactionRepository:
             result_list = result.fetchall()
 
             for row in result_list:
-                row.__dict__.pop('_sa_instance_state', None)
+                row.Transactions.__dict__.pop('_sa_instance_state', None)
 
-            result = [TransactionRead(**row.__dict__) for row in result_list]
+            result = [TransactionRead(**row.Transactions.__dict__) for row in result_list]
             return {
                 "result": result,
                 "no_of_transactions": len(result),
@@ -78,7 +78,7 @@ class TransactionRepository:
         return TransactionRead(**db_transaction.__dict__)
 
     async def patch_transaction(self, transaction_id: Union[str, UUID], transaction: TransactionPatch) -> Union[TransactionRead, HTTPException]:
-        db_transaction = await self._get_instance(transaction_id)
+        db_transaction = (await self._get_instance(transaction_id)).__dict__
         changes = await self._extract_changes(transaction_patch=transaction)
 
         stmt = (
@@ -92,17 +92,18 @@ class TransactionRepository:
         except Exception as e:
             raise http_409(msg=f"Transaction could not be added.") from e
 
+        db_transaction = (await self._get_instance(transaction_id)).__dict__
         return TransactionRead(**db_transaction.__dict__)
 
     async def delete_transaction(self, transaction_id: UUID) -> None:
-        db_transaction = await self._get_instance(transaction_id=transaction_id)
-
-        stmt = (
-            delete(Transactions)
-            .where(Transactions.id == db_transaction.get('id'))
-        )
+        db_transaction = (await self._get_instance(transaction_id=transaction_id)).__dict__
 
         try:
+            stmt = (
+                delete(Transactions)
+                .where(Transactions.id == db_transaction.get('id'))
+            )
+
             await self.session.execute(stmt)
             await self.session.commit()
         except Exception as e:

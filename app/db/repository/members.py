@@ -16,7 +16,7 @@ class MemberRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def _get_instance(self, member_id: Optional[UUID, str] = None, member_name: Optional[str] = None) -> Union[Any, HTTPException]:
+    async def _get_instance(self, member_id: Union[UUID, str] = None, member_name: Optional[str] = None) -> Union[Any, HTTPException]:
         if member_id:
             member_id = UUID(str(member_id))
             stmt = (
@@ -59,9 +59,9 @@ class MemberRepository:
             result_list = result.fetchall()
 
             for row in result_list:
-                row.__dict__.pop('_sa_instance_state', None)
+                row.Members.__dict__.pop('_sa_instance_state', None)
 
-            result = [MemberRead(**row.__dict__) for row in result_list]
+            result = [MemberRead(**row.Members.__dict__) for row in result_list]
             return {
                 "result": result,
                 "no_of_members": len(result),
@@ -85,7 +85,7 @@ class MemberRepository:
         return MemberRead(**db_member.__dict__)
 
     async def patch_member(self, member_id: Union[str, UUID], member: MemberPatch) -> Union[MemberRead, HTTPException]:
-        db_member = await self._get_instance(member_id=member_id)
+        db_member = (await self._get_instance(member_id=member_id)).__dict__
         changes = await self._extract_changes(member_patch=member)
 
         stmt = (
@@ -99,11 +99,12 @@ class MemberRepository:
         except Exception as e:
             raise http_409(msg=f"Error updating member {db_member.get('name')}") from e
 
+        db_member = (await self._get_instance(member_id=member_id)).__dict__
         return MemberRead(**db_member.__dict__)
 
     async def delete_member(self, member_id: Optional[UUID] = None, member_name: Optional[str] = None) -> None:
         try:
-            db_member = await self._get_instance(member_id=member_id, member_name=member_name)
+            db_member = (await self._get_instance(member_id=member_id, member_name=member_name)).__dict__
 
             stmt = (
                 delete(Members)

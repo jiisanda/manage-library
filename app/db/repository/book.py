@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exception import http_404, http_409
 from app.db.tables.library import Book
-from app.schemas.library import BookCreate, BookRead, BookPatch
+from app.schemas.books import BookCreate, BookRead, BookPatch
 
 
 class BookRepository:
@@ -52,9 +52,9 @@ class BookRepository:
             result_list = result.fetchall()
 
             for row in result_list:
-                row.__dict__.pop('_sa_instance_state', None)
+                row.Book.__dict__.pop('_sa_instance_state', None)
 
-            result = [BookRead(**row.__dict__) for row in result_list]
+            result = [BookRead(**row.Book.__dict__) for row in result_list]
             return {
                 "result": result,
                 "no_of_books": len(result),
@@ -79,7 +79,7 @@ class BookRepository:
         return BookRead(**db_book.__dict__)
 
     async def patch_book(self, book_id: Union[str, UUID],  book: BookPatch) -> Union[BookRead, HTTPException]:
-        db_book = await self._get_instance(book_id=book_id)
+        db_book = (await self._get_instance(book_id=book_id)).__dict__
         changes = await self._extract_changes(book_patch=book)
 
         stmt = (
@@ -94,17 +94,18 @@ class BookRepository:
         except Exception as e:
             raise http_409(msg=f"Error while updating book: {book_name}") from e
 
-        return BookRead(**db_book.__dict__)
+        db_book = (await self._get_instance(book_id=book_id)).__dict__
+        return BookRead(**db_book)
 
     async def delete_book(self, book_id: Union[str, UUID]) -> None:
+        db_book = (await self._get_instance(book_id=book_id)).__dict__
+
+        stmt = (
+            delete(Book)
+            .where(Book.id == db_book.get('id'))
+        )
+
         try:
-            db_book = await self._get_instance(book_id=book_id)
-
-            stmt = (
-                delete(Book)
-                .where(Book.id == db_book.get('id'))
-            )
-
             await self.session.execute(stmt)
             await self.session.commit()
         except Exception as e:
