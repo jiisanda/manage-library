@@ -29,6 +29,6 @@ def http_409(msg: str = "Entity already exists") -> HTTPException:
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=msg)
 
 
-def HTTP_500(msg: str = "Internal Server Error") -> HTTPException:
+def http_500(msg: str = "Internal Server Error") -> HTTPException:
     """Raised when error caused due to internal server"""
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
