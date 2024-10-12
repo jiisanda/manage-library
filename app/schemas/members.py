@@ -9,7 +9,7 @@ class MemberCreate(MemberBase):
     ...
 
 
-class MemberPatch(MemberCreate):
+class MemberPatch(MemberBase):
     name: str = None
     email: str = None
     address: str = None
