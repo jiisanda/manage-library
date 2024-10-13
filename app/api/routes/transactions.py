@@ -5,6 +5,8 @@ from fastapi import APIRouter, Body, Depends, Query, HTTPException
 from starlette import status
 
 from app.api.dependencies.repositories import get_repository
+from app.db.repository.book import BookRepository
+from app.db.repository.members import MemberRepository
 from app.db.repository.transactions import TransactionRepository
 from app.schemas.transactions import TransactionRead, TransactionCreate, TransactionPatch
 
@@ -20,9 +22,15 @@ router = APIRouter(tags=["Transactions"])
 async def add_transaction(
         transaction: TransactionCreate = Body(...),
         repository: TransactionRepository = Depends(get_repository(TransactionRepository)),
+        member_repository: MemberRepository = Depends(get_repository(MemberRepository)),
+        book_repository: BookRepository = Depends(get_repository(BookRepository)),
 ) -> TransactionRead:
 
-    return await repository.add_transaction(transaction=transaction)
+    return await repository.add_transaction(
+        transaction=transaction,
+        member=member_repository,
+        book=book_repository,
+    )
 
 
 @router.get(

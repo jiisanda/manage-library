@@ -7,9 +7,12 @@ from sqlalchemy import select, delete, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exception import http_404, http_409
+from app.core.exception import http_404, http_409, http_403
+from app.db.repository.book import BookRepository
+from app.db.repository.members import MemberRepository
 from app.db.tables.enum import TransactionStatus
 from app.db.tables.library import Transactions
+from app.schemas.books import BookPatch
 from app.schemas.transactions import TransactionRead, TransactionCreate, TransactionPatch
 
 
@@ -74,11 +77,34 @@ class TransactionRepository:
         except Exception as e:
             raise http_404(msg=f"Transactions does not exists.") from e
 
-    async def add_transaction(self, transaction: TransactionCreate) -> Union[TransactionRead, HTTPException]:
+    async def add_transaction(
+            self,
+            transaction: TransactionCreate,
+            member: MemberRepository,
+            book: BookRepository,
+    ) -> Union[TransactionRead, HTTPException]:
         if not isinstance(transaction, dict):
             db_transaction = Transactions(**transaction.model_dump())
         else:
             db_transaction = Transactions(**transaction)
+
+        # check member eligibility
+        member_info = await member.get_member(member_id=db_transaction.member_id)
+        if member_info.debt > 500:
+            raise http_403(msg=f"Debt: {member_info.debt} is higher. Limit is: Rs. 500.")
+
+        # update book stock
+        book_info = await book.get_book(book=db_transaction.book_id)
+        if book_info.stock != 0:
+            updated_stock = book_info.stock - 1
+            book_info.__dict__["stock"] = updated_stock
+            await book.patch_book(book_id=db_transaction.book_id, book=BookPatch(
+                isbn=book_info.isbn,
+                publisher=book_info.publisher,
+                title=book_info.title,
+                authors=book_info.authors,
+                stock=updated_stock
+            ))
 
         try:
             self.session.add(db_transaction)
