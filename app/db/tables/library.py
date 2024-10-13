@@ -1,9 +1,9 @@
 from datetime import timezone, datetime
-from typing import List, Optional
+from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import Column, String, Integer, Text, ForeignKey, DateTime, text, Enum
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, relationship
 
 from app.db.models import Base
@@ -15,13 +15,12 @@ class Book(Base):
 
     id: UUID = Column(UUID(as_uuid=True), default=uuid4, primary_key=True, index=True, nullable=False)
     title: str = Column(String)
-    authors: List[str] = Column(ARRAY(String))
+    authors: str = Column(String)
     isbn: str = Column(String)
     publisher: Optional[str] = Column(String)
     stock: int = Column(Integer, default=0)
 
     transactions = relationship("Transactions", backref="book", lazy=True)
-
 
 
 class Members(Base):

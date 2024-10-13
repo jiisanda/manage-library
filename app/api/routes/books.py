@@ -6,6 +6,7 @@ from starlette import status
 
 from app.api.dependencies.repositories import get_repository
 from app.db.repository.book import BookRepository
+from app.db.tables.enum import SearchFields
 from app.schemas.books import BookRead, BookCreate, BookPatch
 
 router = APIRouter(tags=["Books"])
@@ -85,3 +86,19 @@ async def delete_book(
 ) -> None:
 
     await repository.delete_book(book_id=book)
+
+@router.get(
+    "/search",
+    response_model=None,
+    status_code=status.HTTP_200_OK,
+    name="search_books",
+)
+async def search_books(
+        field: SearchFields = Query(..., description="Field to search in (name, author, or isbn)"),
+        query: str = Query(..., description="Search query"),
+        limit: int = Query(default=10, lt=100),
+        offset: int = Query(default=0),
+        repository: BookRepository = Depends(get_repository(BookRepository)),
+) -> Dict[str, Union[List[BookRead], Any]]:
+
+    return await repository.search_books(field=field, query_input=query, limit=limit, offset=offset)

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
@@ -10,7 +10,7 @@ from app.db.tables.enum import TransactionStatus
 class BookBase(BaseModel):
     _id: UUID
     title: str
-    authors: List[str]
+    authors: str
     isbn: str
     publisher: Optional[str]
     stock: int = 0

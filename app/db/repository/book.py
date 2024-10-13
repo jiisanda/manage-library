@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exception import http_404, http_409
+from app.db.tables.enum import SearchFields
 from app.db.tables.library import Book
 from app.schemas.books import BookCreate, BookRead, BookPatch
 
@@ -110,3 +111,36 @@ class BookRepository:
             await self.session.commit()
         except Exception as e:
             raise http_409(msg=f"Error while deleting book: {book_id}") from e
+
+    async def search_books(
+            self,
+            field: SearchFields,
+            query_input: str,
+            limit: int = 10,
+            offset: int = 0
+    ) -> Dict[str, Union[List[BookRead], Any]]:
+        stmt = select(Book)
+
+        match field:
+            case SearchFields.title:
+                stmt = stmt.where(Book.title.ilike(f"%{query_input}%"))
+            case SearchFields.author:
+                stmt = stmt.where(Book.authors.ilike(f"%{query_input}%"))
+            case SearchFields.isbn:
+                stmt = stmt.where(Book.isbn.ilike(f"%{query_input}%"))
+            case _:
+                raise ValueError(f"Invalid search field: {field}")
+
+        stmt = stmt.offset(offset).limit(limit)
+
+        result = await self.session.execute(stmt)
+        books = result.scalars().unique().all()
+
+        book_reads = [BookRead.from_orm(book) for book in books]
+
+        return {
+            "result": book_reads,
+            "query": query_input,
+            "field": field.value,
+            "no_of_books": len(book_reads),
+        }

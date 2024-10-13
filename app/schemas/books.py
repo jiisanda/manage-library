@@ -5,7 +5,9 @@ class BookCreate(BookBase):
     ...
 
 class BookRead(BookBase):
-    ...
+
+    class Config:
+        from_attributes = True
 
 class BookPatch(BookBase):
     isbn: str = None
