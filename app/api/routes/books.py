@@ -102,3 +102,26 @@ async def search_books(
 ) -> Dict[str, Union[List[BookRead], Any]]:
 
     return await repository.search_books(field=field, query_input=query, limit=limit, offset=offset)
+
+
+@router.post(
+    "/import",
+    status_code=status.HTTP_201_CREATED,
+    name="import_books"
+)
+async def import_books(
+        title: str = Query(None),
+        authors: str = Query(None),
+        isbn: str = Query(None),
+        publisher: str = Query(None),
+        pages: int = Query(20, description="Number of books to import"),
+        repository: BookRepository = Depends(get_repository(BookRepository)),
+) -> Dict[str, Union[List[BookRead], Any]]:
+
+    return await repository.import_books(
+        title=title,
+        authors=authors,
+        isbn=isbn,
+        publisher=publisher,
+        pages=pages,
+    )

@@ -2,11 +2,12 @@ from http.client import HTTPException
 from typing import Union, Any, Dict, List
 from uuid import UUID
 
+import httpx
 from sqlalchemy import select, update, delete
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, MultipleResultsFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exception import http_404, http_409
+from app.core.exception import http_404, http_409, http_400
 from app.db.tables.enum import SearchFields
 from app.db.tables.library import Book
 from app.schemas.books import BookCreate, BookRead, BookPatch
@@ -19,12 +20,13 @@ class BookRepository:
     async def _get_instance(self, book_id: Union[str, UUID]) -> Union[Any, HTTPException]:
         try:
             book_id = UUID(str(book_id))
-            stmt = (
-                select(Book)
-                .where(Book.id == book_id)
-            )
         except ValueError:
             raise http_404(msg="Book not found")
+
+        stmt = (
+            select(Book)
+            .where(Book.id == book_id)
+        )
 
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -34,6 +36,18 @@ class BookRepository:
         if isinstance(book_patch, dict):
             return book_patch
         return book_patch.model_dump(exclude_unset=True)
+
+    async def _get_book_bi_isbn(self, isbn: str) -> Union[Any, HTTPException]:
+        stmt = select(Book).where(Book.isbn == isbn)
+
+        result = await self.session.execute(stmt)
+        # Handle multiple results explicitly
+        try:
+            book = result.scalar_one_or_none()
+        except MultipleResultsFound:
+            raise http_400(msg=f"Multiple books found with ISBN {isbn}")
+
+        return book
 
     async def get_book(self, book: Union[str, UUID]) -> Union[BookRead, HTTPException]:
         db_book = await self._get_instance(book_id=book)
@@ -63,12 +77,17 @@ class BookRepository:
         except Exception as e:
             raise http_404(msg=f"Books does not exists.") from e
 
-    async def add_book(self, book: BookCreate) -> Union[BookRead, HTTPException]:
+    async def add_book(self, book: BookCreate) -> Union[BookRead, HTTPException] | None:
 
         if not isinstance(book, dict):
             db_book = Book(**book.model_dump())
         else:
             db_book = Book(**book)
+
+        # checking if book already exists
+        existing_book = await self._get_book_bi_isbn(isbn=db_book.isbn)
+        if existing_book:
+            return None
 
         try:
             self.session.add(db_book)
@@ -143,4 +162,60 @@ class BookRepository:
             "query": query_input,
             "field": field.value,
             "no_of_books": len(book_reads),
+        }
+
+    async def import_books(
+            self,
+            title: str,
+            authors: str,
+            isbn: str,
+            publisher: str,
+            pages: int,
+    ) -> Dict[str, Union[List[BookRead], Any]]:
+        books_imported = []
+        page = 1
+
+        while len(books_imported) < pages:
+            try:
+                # Call the Frappe API with the current page and parameters
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        "https://frappe.io/api/method/frappe-library",
+                        params={
+                            "page": page,
+                            "title": title,
+                            "authors": authors,
+                            "isbn": isbn,
+                            "publisher": publisher,
+                        },
+                    )
+                    data = response.json()
+
+                # Check if the API returned books
+                if not data.get("message"):
+                    raise http_404(msg="Books not found")
+
+                # Add books to the repository
+                for book_data in data["message"]:
+                    if len(books_imported) >= pages:
+                        break
+
+                    book = BookCreate(
+                        title=book_data["title"],
+                        authors=book_data["authors"],
+                        isbn=book_data["isbn"],
+                        publisher=book_data["publisher"],
+                        stock=5,
+                    )
+                    if await self.add_book(book):
+                        books_imported.append(book)
+
+                page += 1
+
+            except Exception as e:
+                raise http_400(msg=f"Error while importing books.") from e
+
+        return {
+            "books": books_imported,
+            "books_imported": len(books_imported)
         }
