@@ -3,7 +3,7 @@ from typing import Union, Any, Dict, List
 from uuid import UUID
 
 import httpx
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,6 +57,12 @@ class BookRepository:
         return BookRead(**db_book.__dict__)
 
     async def get_books(self, limit: int = 10, offset: int=0) -> Dict[str, Union[List[BookRead], Any]]:
+
+        # Query to get the total count of books
+        total_count_stmt = select(func.count()).select_from(Book)
+        total_count_result = await self.session.execute(total_count_stmt)
+        total_books = total_count_result.scalar()  # Get the total number of books
+
         stmt = (
             select(Book)
             .offset(offset)
@@ -72,7 +78,7 @@ class BookRepository:
             result = [BookRead(**row.Book.__dict__) for row in result_list]
             return {
                 "result": result,
-                "no_of_books": len(result),
+                "no_of_books": total_books
             }
         except Exception as e:
             raise http_404(msg=f"Books does not exists.") from e
