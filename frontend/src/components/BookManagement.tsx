@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { fetchBooks, createBook, updateBook, deleteBook } from '../services/api'
 
 interface Book {
-  id: number
+  id: string
   title: string
   authors: string
   stock: number
@@ -20,7 +20,8 @@ interface BookManagementProps {
 
 export function BookManagement({ totalBooks, setTotalBooks }: BookManagementProps) {
   const [books, setBooks] = useState<Book[]>([])
-  const [newBook, setNewBook] = useState<Omit<Book, 'id'>>({ isbn: '', title: '', authors: '', publisher: '', stock: 0 })
+  const [bookForm, setBookForm] = useState<Omit<Book, 'id'>>({ isbn: '', title: '', authors: '', publisher: '', stock: 0 })
+  const [editingBookId, setEditingBookId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [limit] = useState(10)
@@ -32,67 +33,96 @@ export function BookManagement({ totalBooks, setTotalBooks }: BookManagementProp
         setTotalBooks(response.data.no_of_books)
       })
       .catch(err => setError('Failed to fetch books'))
-  }, [currentPage, limit])
+  }, [currentPage, limit, setTotalBooks])
 
-  const addBook = () => {
-    createBook(newBook)
-      .then(response => {
-        setBooks([...books, response.data])
-        setNewBook({isbn: '', title: '', authors: '', publisher: '', stock: 0 })
-        setTotalBooks(prevTotal => prevTotal + 1)
-      })
-      .catch(err => setError('Failed to add book'))
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setBookForm(prev => ({ ...prev, [name]: name === 'stock' ? parseInt(value) : value }))
   }
 
-  const deleteBookHandler = (id: number) => {
+  const resetForm = () => {
+    setBookForm({ isbn: '', title: '', authors: '', publisher: '', stock: 0 })
+    setEditingBookId(null)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editingBookId) {
+      updateBook(editingBookId, bookForm)
+        .then(response => {
+          setBooks(books.map(book => book.id === editingBookId ? { ...response.data, id: editingBookId } : book))
+          resetForm()
+          setError(null)
+        })
+        .catch(err => setError('Failed to update book'))
+    } else {
+      createBook(bookForm)
+        .then(response => {
+          setBooks([...books, response.data])
+          setTotalBooks(prevTotal => prevTotal + 1)
+          resetForm()
+          setError(null)
+        })
+        .catch(err => setError('Failed to add book'))
+    }
+  }
+
+  const handleEdit = (book: Book) => {
+    setBookForm({ isbn: book.isbn, title: book.title, authors: book.authors, publisher: book.publisher, stock: book.stock })
+    setEditingBookId(book.id)
+  }
+
+  const handleDelete = (id: string) => {
     deleteBook(id)
       .then(() => {
         setBooks(books.filter(book => book.id !== id))
         setTotalBooks(prevTotal => prevTotal - 1)
+        setError(null)
       })
       .catch(err => setError('Failed to delete book'))
   }
 
   const totalPages = Math.ceil(totalBooks / limit)
 
-  const truncateText = (text: string, maxLength: number) => {
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
-  }
-
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">Book Management</h2>
       <p className="mb-4">Total Books: {totalBooks}</p>
       {error && <div className="text-red-500 mb-4">{error}</div>}
-      <div className="mb-4 flex gap-4">
+      <form onSubmit={handleSubmit} className="mb-4 grid grid-cols-6 gap-4">
         <Input
           placeholder="ISBN"
-          value={newBook.isbn}
-          onChange={(e) => setNewBook({...newBook, isbn: e.target.value})}
+          name="isbn"
+          value={bookForm.isbn}
+          onChange={handleInputChange}
         />
         <Input
           placeholder="Title"
-          value={newBook.title}
-          onChange={(e) => setNewBook({...newBook, title: e.target.value})}
+          name="title"
+          value={bookForm.title}
+          onChange={handleInputChange}
         />
         <Input
           placeholder="Author"
-          value={newBook.authors}
-          onChange={(e) => setNewBook({...newBook, authors: e.target.value})}
+          name="authors"
+          value={bookForm.authors}
+          onChange={handleInputChange}
         />
         <Input
           placeholder="Publisher"
-          value={newBook.publisher}
-          onChange={(e) => setNewBook({...newBook, publisher: e.target.value})}
+          name="publisher"
+          value={bookForm.publisher}
+          onChange={handleInputChange}
         />
         <Input
           type="number"
           placeholder="Stock"
-          value={newBook.stock}
-          onChange={(e) => setNewBook({...newBook, stock: parseInt(e.target.value)})}
+          name="stock"
+          value={bookForm.stock}
+          onChange={handleInputChange}
         />
-        <Button onClick={addBook}>Add Book</Button>
-      </div>
+        <Button type="submit">{editingBookId ? 'Update Book' : 'Add Book'}</Button>
+      </form>
       <Table>
         <TableHeader>
           <TableRow>
@@ -104,15 +134,15 @@ export function BookManagement({ totalBooks, setTotalBooks }: BookManagementProp
           </TableRow>
         </TableHeader>
         <TableBody>
-          {books.map((book, index) => (
-            <TableRow key={index}>
+          {books.map((book) => (
+            <TableRow key={book.id}>
               <TableCell className="font-medium">{book.isbn}</TableCell>
-              <TableCell title={book.title}>{truncateText(book.title, 40)}</TableCell>
-              <TableCell title={book.authors}>{truncateText(book.authors, 30)}</TableCell>
+              <TableCell>{book.title}</TableCell>
+              <TableCell>{book.authors}</TableCell>
               <TableCell>{book.stock}</TableCell>
               <TableCell>
-                <Button variant="outline" className="mr-2">Edit</Button>
-                <Button variant="destructive" onClick={() => deleteBookHandler(book.id)}>Delete</Button>
+                <Button variant="outline" className="mr-2" onClick={() => handleEdit(book)}>Edit</Button>
+                <Button variant="destructive" onClick={() => handleDelete(book.id)}>Delete</Button>
               </TableCell>
             </TableRow>
           ))}

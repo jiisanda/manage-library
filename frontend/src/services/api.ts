@@ -8,8 +8,8 @@ const api = axios.create({
 
 export const fetchBooks = (limit: number, offset: number) => api.get(`/books?limit=${limit}&offset=${offset}`);
 export const createBook = (book: any) => api.post('/books', book);
-export const updateBook = (id: number, book: any) => api.put(`/books/${id}`, book);
-export const deleteBook = (id: number) => api.delete(`/books/${id}`);
+export const updateBook = (id: string, book: any) => api.put(`/books/${id}`, book);
+export const deleteBook = (id: string) => api.delete(`/books/${id}`);
 export const searchBooks = (query: string) => api.get(`/books/search?q=${query}`);
 
 export const fetchMembers = () => api.get('/members');
